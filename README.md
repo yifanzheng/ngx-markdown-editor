@@ -1,27 +1,212 @@
-# NgxMarkdownEditor
+## ngx-markdown-editor
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 8.3.29.
+最近，尝试在 Angular 项目中实现 Markdown 编辑功能。在网上搜索了一番之后，决定使用 [Editor.md](http://editor.md.ipandao.com/index.html) 插件来实现 Markdown 编辑功能。 Editor.md 功能比较丰富，但是文档不是很友好。
 
-## Development server
+### 使用
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The app will automatically reload if you change any of the source files.
+- 首先，下载 Editor.md 文件，放到 `assets` 目录下。
 
-## Code scaffolding
+- 使用 npm 下载 jquery。
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+```node
+npm install jquery
+```
 
-## Build
+- 在 angular.json 中配置 Editor.md 的 css 和 js。
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory. Use the `--prod` flag for a production build.
+```json
+"styles": [
+  "src/styles.css",
+  "src/assets/editor.md/css/editormd.css"
 
-## Running unit tests
+],
+"scripts": [
+  "node_modules/jquery/dist/jquery.js",
+  "src/assets/editor.md/editormd.js",
+  "src/assets/editor.md/lib/marked.min.js",
+  "src/assets/editor.md/lib/prettify.min.js",
+  "src/assets/editor.md/lib/raphael.min.js",
+  "src/assets/editor.md/lib/underscore.min.js"
+]
+```
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+- 配置 Markdown 编辑器
 
-## Running end-to-end tests
+```json
+{
+    "mode": "gfm",
+    "name": "",
+    "value": "",
+    "theme": "",
+    "editorTheme": "eclipse",
+    "previewTheme": "",
+    "markdown": "",
+    "appendMarkdown": "",
+    "width": "100%",
+    "height": "640",
+    "path": "assets/editor.md/lib/",
+    "pluginPath": "",
+    "delay": 300,
+    "autoLoadModules": true,
+    "watch": true,
+    "placeholder": "Enjoy Markdown! coding now...",
+    "gotoLine": true,
+    "codeFold": true,
+    "autoHeight": false,
+    "autoFocus": true,
+    "autoCloseTags": true,
+    "searchReplace": true,
+    "syncScrolling": true,
+    "readOnly": false,
+    "tabSize": 4,
+    "indentUnit": 4,
+    "lineNumbers": true,
+    "lineWrapping": true,
+    "autoCloseBrackets": true,
+    "showTrailingSpace": true,
+    "matchBrackets": true,
+    "indentWithTabs": true,
+    "styleSelectedText": true,
+    "matchWordHighlight": true,
+    "styleActiveLine": true,
+    "dialogLockScreen": true,
+    "dialogShowMask": true,
+    "dialogDraggable": true,
+    "dialogMaskBgColor": "#fff",
+    "dialogMaskOpacity": 0.1,
+    "fontSize": "13px",
+    "saveHTMLToTextarea": true,
+    "previewCodeHighlight": true,
+    "disabledKeyMaps": [],
+    "imageUpload": false,
+    "imageFormats": [
+        "jpg",
+        "jpeg",
+        "gif",
+        "png",
+        "bmp",
+        "webp"
+    ],
+    "imageUploadURL": "",
+    "crossDomainUpload": false,
+    "uploadCallbackURL": "",
+    "toc": true,
+    "tocm": true,
+    "htmlDecode": true,
+    "pageBreak": true,
+    "atLink": true,
+    "emailLink": true,
+    "taskList": false,
+    "emoji": false,
+    "tex": false,
+    "flowChart": false,
+    "sequenceDiagram": false,
+    "toolbar": true,
+    "toolbarAutoFixed": true,
+    "toolbarIcons": "full",
+    "toolbarTitles": {}
+}
+```
 
-Run `ng e2e` to execute the end-to-end tests via [Protractor](http://www.protractortest.org/).
+- 集成到 Angular 项目中。
 
-## Further help
+**markdown.component.html**
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI README](https://github.com/angular/angular-cli/blob/master/README.md).
+```html
+<div id="markdown-editor">
+    <textarea style="display:none;" [(ngModel)]="markdownContent"></textarea>
+</div>
+```
+
+**markdown.component.ts**
+
+```ts
+declare var editormd: any;
+
+@Component({
+  selector: 'app-markdown',
+  templateUrl: './markdown.component.html',
+  styleUrls: ['./markdown.component.css'],
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => MarkdownComponent),
+      multi: true
+    }
+  ]
+})
+export class MarkdownComponent implements OnInit, ControlValueAccessor {
+
+  markdownContent: string;
+
+  // editormd 对象
+  private markdownEditor: any;
+
+  private editorDefaultConfig = {
+    width: '100%',
+    height: '640',
+    path: 'assets/editor.md/lib/',
+    saveHTMLToTextarea: true
+  };
+
+  private onChange = (_: any) => { };
+  private onTouched = () => { };
+
+  constructor(
+    private markdownService: MarkdownService
+  ) { }
+
+  ngOnInit() {
+    this.editorStartup();
+  }
+
+  writeValue(obj: any): void {
+    this.markdownContent = obj;
+  }
+
+  registerOnChange(fn: any): void {
+    this.onChange = fn;
+  }
+
+  registerOnTouched(fn: any): void {
+    this.onTouched = fn;
+  }
+
+  private editorStartup(): void {
+    this.markdownService.getEditorConfig()
+      .subscribe(
+        res => {
+          const editorConfig = res ? res : this.editorDefaultConfig;
+          this.createEditor(editorConfig);
+        },
+        () => {
+          console.warn('Markdown Editor init failed');
+        }
+      );
+  }
+
+  private createEditor(editorConfig: any): void {
+    this.markdownEditor = editormd('markdown-editor', editorConfig);
+    if (this.markdownEditor) {
+      // 注册变更事件
+      this.markdownEditor.on('change', () => {
+        this.onChange(this.markdownContent);
+        // 获取 html 格式的内容
+        // console.log(this.markdownEditor.getHTML());
+        // 获取 markdown 格式的内容
+        // console.log(this.markdownEditor.getMarkdown());
+      });
+    }
+  }
+}
+```
+
+**app.component.html**
+
+```html
+<app-markdown [(ngModel)]="text"></app-markdown>
+```
+
+### 效果图
+
+![markdown.png](https://i.loli.net/2020/11/14/Z3NESW5y7vOihfM.png)
